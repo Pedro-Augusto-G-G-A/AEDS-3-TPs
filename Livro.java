@@ -14,7 +14,7 @@ public class Livro{
     protected int paginas;
     protected String[] generos;
     protected String descricao;
-    protected long dataPublicacao;
+    protected long dataPublicacao; // Em milissegundos desde 1970
     protected String editora;
     protected String lingua;
     protected float mediaReviews;
