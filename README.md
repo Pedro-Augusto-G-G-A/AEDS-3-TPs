@@ -114,5 +114,5 @@ public class Livro {
 
 ## Autores
 
-**Pedro Augusto Gonçalves Gomes Amaral**
-**Daniella Emily Cornelio da Silva**
+- **Pedro Augusto Gonçalves Gomes Amaral**
+- **Daniella Emily Cornelio da Silva**
