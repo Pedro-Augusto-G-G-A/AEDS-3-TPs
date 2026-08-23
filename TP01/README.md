@@ -47,13 +47,13 @@ O arquivo binário (`livros.bin`) segue um formato personalizado otimizado para 
 - Lê dados do arquivo `Books.csv`
     - `Books.csv` Vêm originalmente de https://www.kaggle.com/datasets/madankhatri123h/books-dataset
         - Modificações à base original:
-            - O livro "Agatha Christie: The Queen of Murder Mysteries (Biography of Her Life)" estava com uma data errada de "101-01-01". Isso nos levou a perceber que o livro é ficticio, não existe, então essa remoção foi a única remoção feita no csv original
-            - O livro "Tales from Shakespeare" estava com uma data errada de "19??". Concertamos a data com base na pesquisa de sua data de lançamento oficial: 2011/07/30
+            - O livro "Agatha Christie: The Queen of Murder Mysteries (Biography of Her Life)" estava com uma data errada de "101-01-01". Isso nos levou a perceber que o livro é ficticio, não existe, então essa remoção foi a única remoção feita no csv original.
+            - O livro "Tales from Shakespeare" estava com uma data errada de "19??". Concertamos a data com base na pesquisa de sua data de lançamento oficial: 2011/07/30.
             - O livro "L'amore bugiardo" possuia sua data em formato datetime, diferentemente do resto inteiro da base de dados. 2012-12-13T00:00:00+01:00 foi alterado para somente 2012-12-13.
         - Deatlhes de implementação:
-            - Livros com "Unknown" pages tiveram seu número de páginas colocadas como -1.
-            - Livros com "No rating" no campo average_rating tiveram esse campo preenchido como -1.
-            - Livros com datas incompletas (somente o ano ou somenete ano-mês) foram completas com 01 nos campos restantes.
+            - Livros com "Unknown" no campo "pages" tiveram seu número de páginas colocadas como -1.
+            - Livros com "No rating" no campo "average_rating" tiveram sua média de reviews preenchido como -1.
+            - Livros com datas incompletas (somente o ano ou somenete ano-mês) foram completados com 01 nos campos restantes.
             - Livros com "Unknown" no campo de datas foram preenchidos como 1º de janeiro de 1970 (long = 0).
 - Ignora a linha de cabeçalho do CSV
 - Faz o parsing do CSV com tratamento adequado de campos entre aspas (incluindo vírgulas dentro das aspas)

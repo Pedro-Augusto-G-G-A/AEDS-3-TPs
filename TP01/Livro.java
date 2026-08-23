@@ -1,9 +1,11 @@
 package TP01;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.StringJoiner;
 
 public class Livro{
@@ -220,7 +222,9 @@ public class Livro{
 
     //Devolve uma string com os dados do livro
     public String toString(){
-        DecimalFormat df= new DecimalFormat("#,#0.0");//formata o valor dos autores
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
+        symbols.setDecimalSeparator(',');
+        DecimalFormat df = new DecimalFormat("0.0", symbols);//formata o valor dos autores
         StringJoiner authors = new StringJoiner(", ");
         for (String autor : getAutores()) {
             authors.add(autor);

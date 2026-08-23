@@ -3,6 +3,7 @@ package TP01;
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.DataOutputStream;
@@ -18,12 +19,14 @@ public class GeradorBin {
 
             br = new BufferedReader(new FileReader("TP01/Dataset/Books.csv"));
 
-            arqBin = new FileOutputStream("livros.bin");
+            arqBin = new FileOutputStream("TP01/livros.bin");
             dos = new DataOutputStream(arqBin);
 
             br.readLine();
 
             int i = 1;
+
+            dos.writeInt(0);
 
             String linha = br.readLine();
             while (linha != null) {
@@ -43,7 +46,7 @@ public class GeradorBin {
 
                 Integer pages = campos[2].equals("Unknown") ? -1 : Integer.parseInt(campos[2]);
 
-                Float qtdReviews = campos[9].equals("No rating") ? -1 : Float.parseFloat(campos[9]);
+                Float qtdReviews = campos[8].equals("No rating") ? -1 : Float.parseFloat(campos[8]);
 
                 Livro livro = new Livro(
                     i++,
@@ -60,47 +63,42 @@ public class GeradorBin {
                     campos[10]
                 );
 
+                dos.writeInt(livro.getId());
+                dos.writeBoolean(false);
+                dos.writeUTF(livro.getTitulo());
+                dos.writeInt(livro.getAutores().length);
+                for(String autor : livro.getAutores()) {
+                    dos.writeUTF(autor);
+                }
+                dos.writeInt(livro.getPaginas());
+                dos.writeInt(livro.getGeneros().length);
+                for(String genero : livro.getGeneros()) {
+                    dos.writeUTF(genero);
+                }
+                dos.writeUTF(livro.getDescricao());
+                dos.writeLong(livro.getDataPublicacao());
+                dos.writeUTF(livro.getEditora());
+                dos.writeChar(livro.getLingua().charAt(0));
+                dos.writeChar(livro.getLingua().charAt(1));
+                dos.writeFloat(livro.getMediaReviews());
+                dos.writeInt(livro.getQtdReviews());
+                dos.writeUTF(livro.getThumbnail());
+
                 System.out.println(livro);
 
                 linha = br.readLine();
             }
 
-            // dos.writeInt(j1.idLivro);
-            // dos.writeUTF(j1.nome);
-            // dos.writeFloat(j1.pontos);
-
-            // dos.writeInt(j2.idLivro);
-            // dos.writeUTF(j2.nome);
-            // dos.writeFloat(j2.pontos);
-
-            // dos.writeInt(j3.idLivro);
-            // dos.writeUTF(j3.nome);
-            // dos.writeFloat(j3.pontos);
-
+            dos.flush();
             dos.close();
             arqBin.close();
 
-            // Livro j_temp= new Livro();
+            try (RandomAccessFile raf = new RandomAccessFile("TP01/livros.bin", "rw")) {
+                raf.seek(0); // Vai pro inicio do arquivo
+                raf.writeInt(i - 1); // Escreve o número de IDs
+            }
 
-            // arq2 =  new FileInputStream("../dados/livro_ds.db");
-            // dis = new DataInputStream(arq2); //conecta o fluxo de entrada de dados ao arquivo
-
-            // j_temp.idLivro= dis.readInt();
-            // j_temp.nome=dis.readUTF();  
-            // j_temp.pontos=dis.readFloat();
-            // System.out.println(j_temp); 
-            
-            // j_temp.idLivro= dis.readInt();
-            // j_temp.nome=dis.readUTF();  
-            // j_temp.pontos=dis.readFloat();
-            // System.out.println(j_temp); 
-           
-            // j_temp.idLivro= dis.readInt();
-            // j_temp.nome=dis.readUTF();  
-            // j_temp.pontos=dis.readFloat();
-            // System.out.println(j_temp); 
-           
-            
+            br.close();
 
         } catch (Exception e) {
             System.out.println(e.getMessage());
