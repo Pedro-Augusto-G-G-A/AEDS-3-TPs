@@ -25,7 +25,8 @@ O arquivo binário (`livros.bin`) segue um formato personalizado otimizado para 
 ```
 [INT: total_registros]
 [
-  [INT: id]              // ID do livro (4 bytes)
+  [INT: id]                                           // ID do livro (4 bytes)
+  [INT: tam_registro]                                 // Tamanho do registro a seguir
   [BOOL: lapide]         // Marcador de exclusão (1 byte): true = deletado, false = ativo
   [INT: tam_titulo] [CHAR*: titulo]                   // String de tamanho variável
   [INT: qtd_autor][INT: tam_autor] [CHAR*: autor]     // Array de Strings de tamanhos variáveis

@@ -3,6 +3,7 @@ package TP01;
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +65,7 @@ public class GeradorBin {
                 );
 
                 dos.writeInt(livro.getId());
+                dos.writeInt(calcularTamanhoRegistro(livro));
                 dos.writeBoolean(false);
                 dos.writeUTF(livro.getTitulo());
                 dos.writeInt(livro.getAutores().length);
@@ -137,6 +139,71 @@ public class GeradorBin {
         campos.add(campo.toString().trim());
         
         return campos.toArray(new String[0]);
+    }
+
+    static private int calcularTamanhoRegistro(Livro livro) throws IOException {
+        int tam = 0;
+        
+        // Lápide (BOOL)
+        tam += 1;
+        
+        // Título (UTF)
+        tam += 4 + getUTFLength(livro.getTitulo());
+        
+        // Autores array
+        tam += 4; // INT: tamanho do array
+        for (String autor : livro.getAutores()) {
+            tam += 4 + getUTFLength(autor); // INT: tamanho + UTF
+        }
+        
+        // Páginas (INT)
+        tam += 4;
+        
+        // Gêneros array
+        tam += 4; // INT: tamanho do array
+        for (String genero : livro.getGeneros()) {
+            tam += 4 + getUTFLength(genero);
+        }
+        
+        // Descrição (UTF)
+        tam += 4 + getUTFLength(livro.getDescricao());
+        
+        // DataPublicacao (LONG)
+        tam += 8;
+        
+        // Editora (UTF)
+        tam += 4 + getUTFLength(livro.getEditora());
+        
+        // Língua (2 CHARs)
+        tam += 2 + 2; // 2 chars = 4 bytes
+        
+        // MediaReviews (FLOAT)
+        tam += 4;
+        
+        // QtdReviews (INT)
+        tam += 4;
+        
+        // Thumbnail (UTF)
+        tam += 4 + getUTFLength(livro.getThumbnail());
+        
+        return tam;
+    }
+
+    // Método para calcular o tamanho de uma string em UTF-8 (DataOutputStream.writeUTF)
+    static private int getUTFLength(String str) {
+        if (str == null) str = "";
+        int utfLength = 0;
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (c >= 0x0001 && c <= 0x007F) {
+                utfLength += 1;
+            } else if (c > 0x07FF) {
+                utfLength += 3;
+            } else {
+                utfLength += 2;
+            }
+        }
+        return utfLength;
     }
 
 }
