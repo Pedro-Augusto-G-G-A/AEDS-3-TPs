@@ -142,52 +142,52 @@ public class GeradorBin {
     }
 
     static private int calcularTamanhoRegistro(Livro livro) throws IOException {
-        int tam = 0;
-        
-        // Lápide (BOOL)
-        tam += 1;
-        
-        // Título (UTF)
-        tam += 4 + getUTFLength(livro.getTitulo());
-        
-        // Autores array
-        tam += 4; // INT: tamanho do array
-        for (String autor : livro.getAutores()) {
-            tam += 4 + getUTFLength(autor); // INT: tamanho + UTF
-        }
-        
-        // Páginas (INT)
-        tam += 4;
-        
-        // Gêneros array
-        tam += 4; // INT: tamanho do array
-        for (String genero : livro.getGeneros()) {
-            tam += 4 + getUTFLength(genero);
-        }
-        
-        // Descrição (UTF)
-        tam += 4 + getUTFLength(livro.getDescricao());
-        
-        // DataPublicacao (LONG)
-        tam += 8;
-        
-        // Editora (UTF)
-        tam += 4 + getUTFLength(livro.getEditora());
-        
-        // Língua (2 CHARs)
-        tam += 2 + 2; // 2 chars = 4 bytes
-        
-        // MediaReviews (FLOAT)
-        tam += 4;
-        
-        // QtdReviews (INT)
-        tam += 4;
-        
-        // Thumbnail (UTF)
-        tam += 4 + getUTFLength(livro.getThumbnail());
-        
-        return tam;
+    int tam = 0;
+    
+    // Lápide (BOOL)
+    tam += 1;
+    
+    // Título (UTF)
+    tam += 2 + getUTFLength(livro.getTitulo());
+    
+    // Autores array
+    tam += 4; // INT: tamanho do array (writeInt = 4 bytes)
+    for (String autor : livro.getAutores()) {
+        tam += 2 + getUTFLength(autor); // UTF = prefixo 2 + texto
     }
+    
+    // Páginas (INT)
+    tam += 4;
+    
+    // Gêneros array
+    tam += 4; // INT: tamanho do array
+    for (String genero : livro.getGeneros()) {
+        tam += 2 + getUTFLength(genero);
+    }
+    
+    // Descrição (UTF)
+    tam += 2 + getUTFLength(livro.getDescricao());
+    
+    // DataPublicacao (LONG)
+    tam += 8;
+    
+    // Editora (UTF)
+    tam += 2 + getUTFLength(livro.getEditora());
+    
+    // Língua (2 CHARs)
+    tam += 2 + 2;
+    
+    // MediaReviews (FLOAT)
+    tam += 4;
+    
+    // QtdReviews (INT)
+    tam += 4;
+    
+    // Thumbnail (UTF)
+    tam += 2 + getUTFLength(livro.getThumbnail());
+    
+    return tam;
+}
 
     // Método para calcular o tamanho de uma string em UTF-8 (DataOutputStream.writeUTF)
     static private int getUTFLength(String str) {
