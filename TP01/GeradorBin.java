@@ -108,7 +108,7 @@ public class GeradorBin {
         
     }
 
-    // Método para tratar uma linha do CSV, transformando-a no formato desejado
+    // Método para tratar uma linha do CSV
     // (tratando o caso dos autores que temos que ignorar as virgulas para o split)
     private static String[] parseCSV(String linha) {
         List<String> campos = new ArrayList<>();
@@ -189,7 +189,6 @@ public class GeradorBin {
     return tam;
 }
 
-    // Método para calcular o tamanho de uma string em UTF-8 (DataOutputStream.writeUTF)
     static private int getUTFLength(String str) {
         if (str == null) str = "";
         int utfLength = 0;
