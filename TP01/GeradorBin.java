@@ -65,7 +65,7 @@ public class GeradorBin {
                 );
 
                 dos.writeInt(livro.getId());
-                dos.writeInt(calcularTamanhoRegistro(livro));
+                dos.writeInt(livro.getTamanhoEmBytes());
                 dos.writeBoolean(false);
                 dos.writeUTF(livro.getTitulo());
                 dos.writeInt(livro.getAutores().length);
@@ -140,69 +140,4 @@ public class GeradorBin {
         
         return campos.toArray(new String[0]);
     }
-
-    static private int calcularTamanhoRegistro(Livro livro) throws IOException {
-    int tam = 0;
-    
-    // Lápide (BOOL)
-    tam += 1;
-    
-    // Título (UTF)
-    tam += 2 + getUTFLength(livro.getTitulo());
-    
-    // Autores array
-    tam += 4; // INT: tamanho do array (writeInt = 4 bytes)
-    for (String autor : livro.getAutores()) {
-        tam += 2 + getUTFLength(autor); // UTF = prefixo 2 + texto
-    }
-    
-    // Páginas (INT)
-    tam += 4;
-    
-    // Gêneros array
-    tam += 4; // INT: tamanho do array
-    for (String genero : livro.getGeneros()) {
-        tam += 2 + getUTFLength(genero);
-    }
-    
-    // Descrição (UTF)
-    tam += 2 + getUTFLength(livro.getDescricao());
-    
-    // DataPublicacao (LONG)
-    tam += 8;
-    
-    // Editora (UTF)
-    tam += 2 + getUTFLength(livro.getEditora());
-    
-    // Língua (2 CHARs)
-    tam += 2 + 2;
-    
-    // MediaReviews (FLOAT)
-    tam += 4;
-    
-    // QtdReviews (INT)
-    tam += 4;
-    
-    // Thumbnail (UTF)
-    tam += 2 + getUTFLength(livro.getThumbnail());
-    
-    return tam;
-}
-
-    static private int getUTFLength(String str) {
-        if (str == null) str = "";
-        int utfLength = 0;
-        for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-            if (c >= 0x0001 && c <= 0x007F) {
-                utfLength += 1;
-            } else if (c > 0x07FF) {
-                utfLength += 3;
-            } else {
-                utfLength += 2;
-            }
-        }
-        return utfLength;
-    }
-
 }

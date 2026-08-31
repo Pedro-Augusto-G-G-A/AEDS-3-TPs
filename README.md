@@ -60,12 +60,14 @@ O arquivo binário (`livros.bin`) segue um formato personalizado otimizado para 
 - Faz o parsing do CSV com tratamento adequado de campos entre aspas (incluindo vírgulas dentro das aspas)
 - Converte e armazena os dados no formato binário personalizado
 
-### 2. Gerenciador de Arquivo Binário (`ManipuladorBin.java`)
-- **Create (Criar)**: Adiciona novos livros ao banco de dados
-- **Read (Ler)**: Recupera informações de um livro pelo ID
-- **Update (Atualizar)**: Modifica registros de livros existentes
-- **Delete (Deletar)**: Exclusão lógica usando marcador de lápide (soft delete)
-- **Sort (Ordenar)**: Ordena os registros por diferentes critérios (ID, título, páginas, etc.)
+### 2. Gerenciador de Arquivo Binário (`Menu.java`)
+- **Manipulador de Arquivo Binário (`CRUD.java`)**
+    - **Create (Criar)**: Adiciona novos livros ao banco de dados
+    - **Read (Ler)**: Recupera informações de um livro pelo ID
+    - **Update (Atualizar)**: Modifica registros de livros existentes
+    - **Delete (Deletar)**: Exclusão lógica usando marcador de lápide (soft delete)
+- **Ordenador de Arquivo Binário (`Ordenacao.java`)**
+    - **Sort (Ordenar)**: Ordena os registros por diferentes critérios (ID, título, páginas, etc.)
 
 ## Tecnologias Utilizadas
 
@@ -98,7 +100,7 @@ java TP01.GeradorBin
 
 ```bash
 # Executar o gerenciador do arquivo binário
-java TP01.ManipuladorBin
+java TP01.Menu
 ```
 
 

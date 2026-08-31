@@ -1,5 +1,6 @@
 package TP01;
 
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.ParseException;
@@ -245,5 +246,50 @@ public class Livro{
                 "\nmedia das reviews: " + df.format(getMediaReviews()) + 
                 "\nnumero de reviews: " + getQtdReviews() + 
                 "\nthumbnail: " + getThumbnail();
+    }
+
+    public int getTamanhoEmBytes() throws IOException {
+        int tamRegistro = 0;
+        tamRegistro += 1; // lapide
+
+        tamRegistro += 2 + tamanhoUTF(this.getTitulo());
+
+        tamRegistro += 4;
+        for (String autor : this.getAutores()) {
+            tamRegistro += 2 + tamanhoUTF(autor);
+        }
+
+        tamRegistro += 4; // paginas
+
+        tamRegistro += 4;
+        for (String genero : this.getGeneros()) {
+            tamRegistro += 2 + tamanhoUTF(genero);
+        }
+
+        tamRegistro += 2 + tamanhoUTF(this.getDescricao());
+        tamRegistro += 8; // data
+        tamRegistro += 2 + tamanhoUTF(this.getEditora());
+        tamRegistro += 2 + 2; // lingua/idioma
+        tamRegistro += 4; // media
+        tamRegistro += 4; // qtdReviews
+        tamRegistro += 2 + tamanhoUTF(this.getThumbnail());
+
+        return tamRegistro;
+    }
+
+    static private int tamanhoUTF(String texto) {
+        if (texto == null) texto = "";
+        int qtdBytes = 0;
+        for (int i = 0; i < texto.length(); i++) {
+            char c = texto.charAt(i);
+            if (c >= 0x0001 && c <= 0x007F) {
+                qtdBytes += 1;
+            } else if (c > 0x07FF) {
+                qtdBytes += 3;
+            } else {
+                qtdBytes += 2;
+            }
+        }
+        return qtdBytes;
     }
 }
