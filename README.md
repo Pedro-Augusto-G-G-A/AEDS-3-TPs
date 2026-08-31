@@ -5,14 +5,19 @@
 Este projeto implementa um sistema de banco de dados de livros em arquivo binário usando Java. É composto por dois componentes principais que trabalham juntos para fornecer armazenamento e manipulação eficiente de dados:
 
 1. **Conversor CSV para Binário** (`GeradorBin.java`) - Lê dados de livros de um arquivo CSV e os converte para um formato binário personalizado
-2. **Gerenciador de Arquivo Binário** (`ManipuladorBin.java`) - Fornece operações CRUD (Create, Read, Update, Delete) e ordenação no arquivo binário
+2. **Gerenciador de Arquivo Binário** (`Menu.java`) - Fornece um menu interativo para o usuário escolher como alterar os dados
+3. **Manipulador de Arquivo Binário** (`CRUD.java`) - Fornece operações CRUD (Create, Read, Update, Delete) e ordenação no arquivo binário
+4. **Ordernador de Arquivo Binário** (`Ordenacao.java`) - Ordena o arquivo binário, deletando fisicamente registros deletados logicamente.
+
 
 ## Estrutura do Projeto
 
 ```
 TP01/
 ├── GeradorBin.java          # Conversor CSV para Binário
-├── ManipuladorBin.java      # Gerenciador do arquivo binário com CRUD e ordenação
+├── Menu.java                # Gerenciador do arquivo binário com CRUD e ordenação
+├── CRUD.java                # Arquivo responsável pelo CRUD
+├── Ordenacao.java           # Arquivo responsável pela ordenação
 ├── Livro.java               # Classe entidade Livro
 └── Dataset/
     └── Books.csv            # Conjunto de dados fonte (informações dos livros)

@@ -7,7 +7,7 @@ public class CRUD {
 
     /*parte suporte pro CRUD */
 
-    private static void salvarDados(RandomAccessFile raf, Livro livro) throws IOException {
+    public static void salvarDados(RandomAccessFile raf, Livro livro) throws IOException {
         raf.writeUTF(livro.getTitulo());
 
         raf.writeInt(livro.getAutores().length);
@@ -42,6 +42,10 @@ public class CRUD {
     public static Livro lerRegistro(RandomAccessFile raf, int id) throws IOException {
         boolean lapide = raf.readBoolean();
 
+        if (lapide) {
+            return null;
+        }
+
         String titulo = raf.readUTF();
 
         int numAutores = raf.readInt();
@@ -69,10 +73,6 @@ public class CRUD {
         float mediaReviews = raf.readFloat();
         int qtdReviews = raf.readInt();
         String thumbnail = raf.readUTF();
-
-        if (lapide) {
-            return null;
-        }
 
         return new Livro(id, titulo, autores, paginas, generos, descricao,
                         dataPublicacao, editora, lingua, mediaReviews, qtdReviews, thumbnail);
@@ -136,8 +136,6 @@ public class CRUD {
 
                 if (tamanhoNovo <= tamanhoAntigo) {
                     // se for do mesmo tamanho, sobrescreve o antigo
-                    raf.seek(raf.getFilePointer() - 4);
-                    raf.write(tamanhoNovo);
                     raf.writeBoolean(false);
                     salvarDados(raf, novoLivro);
                 } else {

@@ -3,6 +3,8 @@ package TP01;
 import java.util.Scanner;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class Menu {
         
@@ -10,7 +12,8 @@ public class Menu {
         int opcao = -1;
         
         Scanner scanner = new Scanner(System.in);
-        RandomAccessFile raf = new RandomAccessFile("TP01/livros.bin", "rw");
+        Path fonte = Paths.get("TP01/livros.bin");
+        RandomAccessFile raf = new RandomAccessFile(fonte.toString(), "rw");
 
         while (opcao != 0) {
             System.out.println("\n===== SISTEMA GERENCIADOR DE BANCO DE DADOS - LIVROS =====");
@@ -26,8 +29,10 @@ public class Menu {
                     menuCRUD(raf, scanner);
                     break;
                 case 2:
-                //ordenação colocar aq
-                break;
+                    raf.close();
+                    Ordenacao.main(fonte);
+                    raf = new RandomAccessFile(fonte.toString(), "rw");
+                    break;
                 case 0:
                     System.out.println("Fechando o programa");
                     break;
