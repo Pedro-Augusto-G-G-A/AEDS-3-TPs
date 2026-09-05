@@ -33,7 +33,11 @@ public class Menu {
                 case 2:
                     /*fecha o arquivo antes de ordenar, pois mexe diretamente nele, e reabre depois de terminar */
                     raf.close();
-                    Ordenacao.main(fonte);
+
+                    int numCaminhos = lerInteiroPositivo(scanner, "Número de caminhos (mínimo 2): ", 2);
+                    int maxRegistros = lerInteiroPositivo(scanner, "Número máximo de registros em memória primária: ", 1);
+
+                    Ordenacao.main(fonte, numCaminhos, maxRegistros);
                     raf = new RandomAccessFile(fonte.toString(), "rw");
                     break;
                 case 0:
@@ -47,6 +51,21 @@ public class Menu {
         scanner.close();
     }
 
+       // lê um inteiro do usuário, repetindo até ser válido e maior/igual ao mínimo exigido
+    private static int lerInteiroPositivo(Scanner scanner, String mensagem, int minimo) {
+        while (true) {
+            System.out.print(mensagem);
+            try {
+                int valor = Integer.parseInt(scanner.nextLine());
+                if (valor >= minimo) {
+                    return valor;
+                }
+                System.out.println("Digite um valor maior ou igual a " + minimo);
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+    }
     //menu do CRUD
     private static void menuCRUD(RandomAccessFile raf, Scanner scanner) throws IOException {
         
