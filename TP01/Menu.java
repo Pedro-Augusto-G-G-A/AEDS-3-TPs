@@ -9,26 +9,29 @@ import java.nio.file.Paths;
 public class Menu {
         
     public static void main(String[] args) throws IOException {
-        int opcao = -1;
+        int opção = -1;
         
         Scanner scanner = new Scanner(System.in);
         Path fonte = Paths.get("TP01/livros.bin");
         RandomAccessFile raf = new RandomAccessFile(fonte.toString(), "rw");
 
-        while (opcao != 0) {
+                // Loop do CRUD, roda até o usuário escolher sair (0)
+
+        while (opção != 0) {
             System.out.println("\n===== SISTEMA GERENCIADOR DE BANCO DE DADOS - LIVROS =====");
             System.out.println("1 - CRUD");
             System.out.println("2 - Ordenar");
             System.out.println("0 - Sair");
             System.out.print("Escolha uma opção: ");
 
-            opcao = Integer.parseInt(scanner.nextLine());
+            opção = Integer.parseInt(scanner.nextLine());
 
-            switch (opcao) {
+            switch (opção) {
                 case 1:
                     menuCRUD(raf, scanner);
                     break;
                 case 2:
+                    /*fecha o arquivo antes de ordenar, pois mexe diretamente nele, e reabre depois de terminar */
                     raf.close();
                     Ordenacao.main(fonte);
                     raf = new RandomAccessFile(fonte.toString(), "rw");
@@ -44,12 +47,12 @@ public class Menu {
         scanner.close();
     }
 
-    //menu do crud
+    //menu do CRUD
     private static void menuCRUD(RandomAccessFile raf, Scanner scanner) throws IOException {
         
-        int opcao = -1;
+        int opção = -1;
 
-        while (opcao != 0) {
+        while (opção != 0) {
             System.out.println("\n----- CRUD -----");
             System.out.println("1 - Inserir um novo livro");
             System.out.println("2 - Buscar livro (pelo ID)");
@@ -58,9 +61,9 @@ public class Menu {
             System.out.println("0 - Voltar");
             System.out.print("Escolha uma opção: ");
 
-            opcao = Integer.parseInt(scanner.nextLine());
+            opção = Integer.parseInt(scanner.nextLine());
 
-            switch (opcao) {
+            switch (opção) {
                 case 1:
                     create(raf, scanner);
                     break;
@@ -76,11 +79,12 @@ public class Menu {
                 case 0:
                     break;
                 default:
-                    System.out.println("Opção inválida");
+                    System.out.println("opção inválida");
             }
         }
     }
 
+    // pega os dados de um novo registro pelo terminal e chama CRUD.create para gravar no arquivo
     private static void create(RandomAccessFile raf, Scanner scanner) throws IOException {
         System.out.println("\n--- Inserir novo livro ---");
 
@@ -90,6 +94,7 @@ public class Menu {
         System.out.print("Autor(es) (separados por vírgula): ");
         String[] autores = scanner.nextLine().split(",");
 
+        //valida a entrada de páginas, repetindo até o usuário digitar um número válido
         int paginas = 0;
         while (true) {
             System.out.print("Número de páginas: ");
@@ -115,6 +120,7 @@ public class Menu {
         while (true) {
             System.out.print("Idioma (2 caracteres, ex: en, pt): ");
             lingua = scanner.nextLine();
+            //valida que tem exatamente 2 caracteres
             if (lingua.length() == 2) {
                 break;
             }
@@ -123,7 +129,8 @@ public class Menu {
 
         float mediaReviews = 0;
         while (true) {
-            System.out.print("Média das reviews: ");
+            System.out.print("Média das reviews (em ponto): ");
+            //valida se é um número decimal
             try {
                 mediaReviews = Float.parseFloat(scanner.nextLine());
                 break;
@@ -135,6 +142,7 @@ public class Menu {
         int qtdReviews = 0;
         while (true) {
             System.out.print("Quantidade de reviews: ");
+            //valida como um número inteiro
             try {
                 qtdReviews = Integer.parseInt(scanner.nextLine());
                 break;
@@ -148,6 +156,7 @@ public class Menu {
 
         Livro livro = null;
         while (livro == null) {
+            //*******************************************************olhar aqui
             System.out.print("Data de publicação (yyyy/MM/dd, yyyy-MM-dd, yyyy-MM, yyyy ou Unknown): ");
             String dataPublicacao = scanner.nextLine();
 
@@ -158,12 +167,12 @@ public class Menu {
                 System.out.println("Data inválida, tente novamente (" + e.getMessage() + ")");
             }
         }
-
+        // id é gerado dentro do CRUD.create, não é definido pelo usuário
         int idGerado = CRUD.create(raf, livro);
         System.out.println("Livro inserido! ID: " + idGerado);
     }
 
-
+    //busca e exibe o registro de um livro pelo id, se existir
     private static void read(RandomAccessFile raf, Scanner scanner) throws IOException {
         System.out.println("\n--- Buscar livro ---");
         System.out.print("Id do livro: ");
@@ -178,6 +187,7 @@ public class Menu {
         }
     }
 
+//atualiza um livro existente, permitindo manter os valores atuais ao apertar enter em cada campo
 
     private static void update(RandomAccessFile raf, Scanner scanner) throws IOException {
         System.out.println("\n--- Atualizar livro ---");
@@ -203,6 +213,7 @@ public class Menu {
         String autoresInput = scanner.nextLine();
         String[] autores = autoresInput.isEmpty() ? livroAtual.getAutores() : autoresInput.split(",");
 
+        //aqui verifica os números preenchidos para ver se são válidos
         int paginas = livroAtual.getPaginas();
         while (true) {
             System.out.print("Número de páginas [" + livroAtual.getPaginas() + "]: ");
@@ -223,6 +234,7 @@ public class Menu {
         String generosInput = scanner.nextLine();
         String[] generos = generosInput.isEmpty() ? livroAtual.getGeneros() : generosInput.split(",");
 
+        //valida o tamanho máximo da descrição apenas se o usuário digitar de novo
         String descricao = livroAtual.getDescricao();
         while (true) {
             System.out.print("Descrição (até 500 caracteres) [manter atual]: ");
@@ -241,6 +253,7 @@ public class Menu {
         String editoraInput = scanner.nextLine();
         String editora = editoraInput.isEmpty() ? livroAtual.getEditora() : editoraInput;
 
+        //se digitar algo novo, verifica se possui 2 caracteres
         String lingua = livroAtual.getLingua();
         while (true) {
             System.out.print("Língua (2 caracteres) [" + livroAtual.getLingua() + "]: ");
@@ -313,6 +326,7 @@ public class Menu {
         }
     }
 
+    // deleta logicamente um livro pelo id digitado
     private static void delete(RandomAccessFile raf, Scanner scanner) throws IOException {
         System.out.println("\n--- Deletar livro ---");
         System.out.print("Id do livro: ");
