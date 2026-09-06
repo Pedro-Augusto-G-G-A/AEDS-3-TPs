@@ -123,17 +123,17 @@ public class CRUD {
         while (raf.getFilePointer() < tamanhoArquivo) {
             int id = raf.readInt();
             int tamanho = raf.readInt();
+            long posInicioRegistro = raf.getFilePointer();
 
             if (id == idBuscado) {
                 Livro livro = lerRegistro(raf, id);
                 if (livro != null) {
-                    encontrado = livro; 
+                    encontrado = livro;
                 }
-            } else {
-                // não é o id procurado, pula os bytes dele (lápide e dados) sem ler
-                raf.skipBytes(tamanho);
             }
-        }
+
+            raf.seek(posInicioRegistro + tamanho);
+}
 
         return encontrado;
     }
