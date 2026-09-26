@@ -90,15 +90,16 @@ public class CRUD {
     // ******************CRUD*****************
 
 
-    //cria um novo registro no final do arquivo e atualiza o cabeçalho com o novo último id
-
-    public static int create(RandomAccessFile raf, Livro livro) throws IOException {
+    // Cria um novo registro no final do arquivo, atualiza o cabeçalho e insere no índice
+    public static int create(RandomAccessFile raf, ArvoreBMais arvore, Livro livro) throws IOException {
         int novoId = proxId(raf);
-
         livro.setId(novoId);
 
-        //vai pro final do arquivo, todos os novos registros são inseridos no final
+        // vai pro final do arquivo — novos registros sempre entram no fim
         raf.seek(raf.length());
+
+        // >>> posição do início do registro (onde o id vai ser escrito)
+        long posicao = raf.getFilePointer();
 
         int tamanho = livro.getTamanhoEmBytes();
         raf.writeInt(novoId);
@@ -106,104 +107,93 @@ public class CRUD {
         raf.writeBoolean(false);
         salvarDados(raf, livro);
 
-        //atualiza o cabeçalho com o id mais recente usado
+        // >>> insere no índice B-Tree
+        arvore.insere(novoId, posicao);
+
+        // atualiza o cabeçalho com o último id usado
         raf.seek(0);
         raf.writeInt(novoId);
 
         return novoId;
     }
 
-    //busca um registro pelo id, percorrendo sequencialmente
-    public static Livro read(RandomAccessFile raf, int idBuscado) throws IOException {
-        raf.seek(4); // pula os 4 bytes do cabeçalho (último id)
-        long tamanhoArquivo = raf.length();
+    //busca um registro pelo id usando o índice da Árvore B
+    public static Livro read(RandomAccessFile raf, ArvoreBMais arvore, int idBuscado) throws IOException {
+        long posicao = arvore.busca(idBuscado);
 
-        Livro encontrado = null;
-
-        while (raf.getFilePointer() < tamanhoArquivo) {
-            int id = raf.readInt();
-            int tamanho = raf.readInt();
-            long posInicioRegistro = raf.getFilePointer();
-
-            if (id == idBuscado) {
-                Livro livro = lerRegistro(raf, id);
-                if (livro != null) {
-                    encontrado = livro;
-                }
-            }
-
-            raf.seek(posInicioRegistro + tamanho);
-}
-
-        return encontrado;
-    }
-
-    /*atualiza um registro existente, se o novo cabe no espaço antigo, apenas sobreescreve.
-    se não, marca o antigo como lápide e escreve o novo no final do arquivo */
-    public static boolean update(RandomAccessFile raf, int idBuscado, Livro novoLivro) throws IOException {
-        raf.seek(4); 
-
-        long tamanhoArquivo = raf.length();
-
-        while (raf.getFilePointer() < tamanhoArquivo) {
-            int id = raf.readInt();
-            int tamanhoAntigo = raf.readInt();
-
-            if (id == idBuscado) {
-                int tamanhoNovo = novoLivro.getTamanhoEmBytes();
-
-                if (tamanhoNovo <= tamanhoAntigo) {
-                    // se for do mesmo tamanho, sobrescreve o antigo
-                    raf.writeBoolean(false);
-                    salvarDados(raf, novoLivro);
-                } else {
-                    // se for tamanho diferente, marca o antigo como lápide e adiciona o novo no final
-                    raf.writeBoolean(true);
-
-                    raf.seek(raf.length());
-                    raf.writeInt(idBuscado);
-                    raf.writeInt(tamanhoNovo);
-                    raf.writeBoolean(false);
-                    salvarDados(raf, novoLivro);
-                }
-
-                return true;
-            } else {
-                raf.skipBytes(tamanhoAntigo);
-            }
+        // -1 => id não está no índice
+        if (posicao == -1) {
+            return null;
         }
 
-        return false;
+        // A posição aponta pro começo do registro (campo id).
+        // Pula id (4 bytes) + tamanho (4 bytes) pra chegar na lápide.
+        raf.seek(posicao + 8);
+
+        // lerRegistro já checa a lápide e devolve null se deletado.
+        return lerRegistro(raf, idBuscado);
     }
 
-    //realiza a exclusão lógica do registro do id buscado
-    public static boolean delete(RandomAccessFile raf, int idBuscado) throws IOException {
-        raf.seek(4);
-        long tamanhoArquivo = raf.length();
+    /* Atualiza um registro existente. Usa a árvore B pra localizar a posição atual.
+    Se o novo conteúdo couber no espaço antigo, sobrescreve no lugar.
+    Se não, marca lápide no antigo, escreve no fim e atualiza a árvore. */
+    public static boolean update(RandomAccessFile raf, ArvoreBMais arvore,
+                                int idBuscado, Livro novoLivro) throws IOException {
 
-        boolean encontrouAlgum = false;
+        long posicao = arvore.busca(idBuscado);
+        if (posicao == -1) return false; // id nem está na árvore
 
-        while (raf.getFilePointer() < tamanhoArquivo) {
-            int id = raf.readInt();
-            int tamanho = raf.readInt();
-            long posicaoLapide = raf.getFilePointer();
-            // guarda a posição do byte de lápide pra reescrever depois
+        // Posição do registro: [id:4][tamanho:4][lapide:1][dados...]
+        raf.seek(posicao + 8); // pula id e tamanho, chega na lápide
+        boolean lapide = raf.readBoolean();
+        if (lapide) return false; // já deletado
 
-            if (id == idBuscado) {
-                raf.seek(posicaoLapide);
-                raf.writeBoolean(true);
-                encontrouAlgum = true;
-                //se achou, marca a lápide como true
+        // Volta pra ler o tamanho alocado
+        raf.seek(posicao + 4);
+        int tamanhoAntigo = raf.readInt();
 
-                // vai para o próximo registro
-                raf.seek(posicaoLapide);
-                raf.skipBytes(tamanho); 
-            } else {
-                raf.skipBytes(tamanho);
-            }
+        int tamanhoNovo = novoLivro.getTamanhoEmBytes();
+
+        if (tamanhoNovo <= tamanhoAntigo) {
+            // ---------- cabe no espaço antigo: sobrescreve no lugar ----------
+            raf.seek(posicao + 8);        // posição da lápide
+            raf.writeBoolean(false);      // reafirma que não está deletado
+            salvarDados(raf, novoLivro);
+            // árvore continua apontando pro mesmo lugar: nada a fazer
+        } else {
+            // ---------- não cabe: marca lápide no antigo e escreve no fim ----------
+            raf.seek(posicao + 8);
+            raf.writeBoolean(true);
+
+            raf.seek(raf.length());
+            long novaPosicao = raf.getFilePointer();   // <-- posição do novo registro
+            raf.writeInt(idBuscado);
+            raf.writeInt(tamanhoNovo);
+            raf.writeBoolean(false);
+            salvarDados(raf, novoLivro);
+
+            // Atualiza o índice: o id agora mora em novaPosicao
+            arvore.atualiza(idBuscado, novaPosicao);
         }
 
-        return encontrouAlgum;
+        return true;
     }
 
+    // realiza a exclusão lógica do registro e remove a chave do índice
+    public static boolean delete(RandomAccessFile raf, ArvoreBMais arvore, int idBuscado) throws IOException {
+        long posicao = arvore.busca(idBuscado);
+        if (posicao == -1) return false;               // id nem está na árvore
+
+        // posição do registro: [id:4][tamanho:4][lapide:1][dados...]
+        raf.seek(posicao + 8);
+        boolean lapide = raf.readBoolean();
+        if (lapide) return false;                      // já deletado
+
+        raf.seek(posicao + 8);
+        raf.writeBoolean(true);                     // marca lápide
+
+        arvore.remove(idBuscado);                     // remove do índice
+
+        return true;
+    }
 }
