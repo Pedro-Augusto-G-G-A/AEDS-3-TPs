@@ -45,7 +45,7 @@ public class ArvoreBMais {
         if (ordem < 3) throw new IllegalArgumentException("Ordem mínima é 3");
         this.ordem = ordem;
         this.MAX_CHAVES = ordem;
-        this.MIN_CHAVES = (ordem + 1) / 2;
+        this.MIN_CHAVES = (ordem - 1) / 2;
         this.MAX_FILHOS = ordem + 1;
 
         // #elementos(4) + d * (8 + 4 + 8 + 8) = 4 + d*28
@@ -60,21 +60,21 @@ public class ArvoreBMais {
 
     // Lê o arquivo
     public ArvoreBMais(File caminho) throws IOException {
+        if (!caminho.exists()) {
+            throw new IOException("Arquivo \"" + caminho + "\" inexistente.");
+        }
+
         arq = new RandomAccessFile(caminho, "rw");
 
-        if(!caminho.exists()) {
-            throw new IOException("Arquivo \"" + caminho + "\" inexistente.");
-        } else {
-            this.ordem = arq.readInt();
-            this.MAX_CHAVES = ordem;
-            this.MIN_CHAVES = (ordem + 1) / 2;
-            this.MAX_FILHOS = ordem + 1;
-            raiz = arq.readLong();
+        this.ordem = arq.readInt();
+        this.MAX_CHAVES = ordem;
+        this.MIN_CHAVES = (ordem - 1) / 2;
+        this.MAX_FILHOS = ordem + 1;
+        raiz = arq.readLong();
 
-            if (this.ordem < 3) throw new IllegalArgumentException("Ordem mínima é 3");
-            // #elementos(4) + d * (8 + 4 + 8 + 8) = 4 + d*28
-            this.TAMANHO_NO = 4 + MAX_CHAVES * (8 + 4 + 8 + 8);
-        }
+        if (this.ordem < 3) throw new IllegalArgumentException("Ordem mínima é 3");
+        // #elementos(4) + d * (8 + 4 + 8 + 8) = 4 + d*28
+        this.TAMANHO_NO = 4 + MAX_CHAVES * (8 + 4 + 8 + 8);
     }
 
     public int getOrdem() { return ordem; }
@@ -291,6 +291,299 @@ public class ArvoreBMais {
         if (i < no.n && id == no.ids[i]) return no.enderecos[i];
         if (no.folha()) return -1;
         return buscaRec(no.filhos[i], id);
+    }
+
+    /**
+     * Atualiza o endereço associado a um id, SEM alterar a estrutura da árvore.
+     * Retorna true se achou a chave e reescreveu o nó.
+     */
+    public boolean atualiza(int id, long novoEndereco) throws IOException {
+        if (raiz == -1) return false;
+        return atualizaRec(raiz, id, novoEndereco);
+    }
+
+    private boolean atualizaRec(long pos, int id, long novoEndereco) throws IOException {
+        No no = leNo(pos);
+        int i = 0;
+        while (i < no.n && id > no.ids[i]) i++;
+        if (i < no.n && id == no.ids[i]) {
+            no.enderecos[i] = novoEndereco;
+            escreveNo(no);
+            return true;
+        }
+        if (no.folha()) return false;
+        return atualizaRec(no.filhos[i], id, novoEndereco);
+    }
+
+    // ---------- Remoção ----------
+
+    public boolean remove(int id) throws IOException {
+        if (raiz == -1) return false;
+
+        boolean removed = removeRec(raiz, id);
+
+        if (removed) {
+            No r = leNo(raiz);
+            if (r.n == 0) {
+                // árvore encolheu
+                if (r.folha()) raiz = -1;
+                else raiz = r.filhos[0];
+                atualizaRaiz();
+            }
+        }
+        return removed;
+    }
+
+    private boolean removeRec(long pos, int id) throws IOException {
+        No no = leNo(pos);
+
+        // Caso especial: nó vazio com um filho (só a raiz chega nesse estado,
+        // após merges sucessivos). Desce direto sem fill.
+        if (no.n == 0 && !no.folha()) {
+            return removeRec(no.filhos[0], id);
+        }
+
+        int i = 0;
+        while (i < no.n && id > no.ids[i]) i++;
+
+        // ---- Caso 1 e 2: a chave está neste nó ----
+        if (i < no.n && no.ids[i] == id) {
+            if (no.folha()) {
+                // 1) remove direto da folha
+                removeKeyFromNo(no, i);
+                escreveNo(no);
+                return true;
+            } else {
+                return removeFromInternal(no, i);
+            }
+        }
+
+        // ---- Caso 3: desce pro filho ----
+        if (no.folha()) return false;
+
+        No filho = leNo(no.filhos[i]);
+        if (filho.n <= MIN_CHAVES) {
+            // garante que o filho tem MAIS que MIN_CHAVES antes de descer
+            fill(no, i);
+            // fill pode ter mudado o nó pai (merge); recarrega e reencontra o índice
+            no = leNo(pos);
+            i = 0;
+            while (i < no.n && id > no.ids[i]) i++;
+        }
+        return removeRec(no.filhos[i], id);
+    }
+
+    /** Remove a chave no índice idx do nó (in-place). */
+    private void removeKeyFromNo(No no, int idx) {
+        for (int j = idx; j < no.n - 1; j++) {
+            no.ids[j] = no.ids[j + 1];
+            no.enderecos[j] = no.enderecos[j + 1];
+        }
+        if (!no.folha()) {
+            for (int j = idx + 1; j < no.n; j++) {
+                no.filhos[j] = no.filhos[j + 1];
+            }
+            no.filhos[no.n] = -1;
+        }
+        no.n--;
+    }
+
+    /** Chave em nó interno: troca por predecessor/sucessor e desce pra remover. */
+    private boolean removeFromInternal(No no, int idx) throws IOException {
+        No esq = leNo(no.filhos[idx]);
+
+        if (esq.n > MIN_CHAVES) {
+            // 2a) predecessor
+            int[] pId = new int[1];
+            long[] pEnd = new long[1];
+            getPredecessor(no.filhos[idx], pId, pEnd);
+
+            int alvo = pId[0];   // guarda antes de sobrescrever
+            no.ids[idx] = pId[0];
+            no.enderecos[idx] = pEnd[0];
+            escreveNo(no);
+            return removeRec(no.filhos[idx], alvo);
+        }
+
+        No dir = leNo(no.filhos[idx + 1]);
+        if (dir.n > MIN_CHAVES) {
+            // 2b) sucessor
+            int[] sId = new int[1];
+            long[] sEnd = new long[1];
+            getSuccessor(no.filhos[idx + 1], sId, sEnd);
+
+            int alvo = sId[0];
+            no.ids[idx] = sId[0];
+            no.enderecos[idx] = sEnd[0];
+            escreveNo(no);
+            return removeRec(no.filhos[idx + 1], alvo);
+        }
+
+        // 2c) merge dos dois filhos + a chave do meio
+        mergeWithRight(no, idx);
+        escreveNo(no);
+        return removeRec(no.filhos[idx], idx);
+    }
+
+    /**
+     * Garante que o filho i do pai tenha MAIS que MIN_CHAVES chaves.
+     * Tenta emprestar de irmão; se não der, faz merge.
+     */
+    private void fill(No pai, int i) throws IOException {
+        // tenta irmão esquerdo
+        if (i > 0) {
+            No esq = leNo(pai.filhos[i - 1]);
+            if (esq.n > MIN_CHAVES) {
+                borrowFromLeft(pai, i);
+                return;
+            }
+        }
+        // tenta irmão direito
+        if (i < pai.n) {
+            No dir = leNo(pai.filhos[i + 1]);
+            if (dir.n > MIN_CHAVES) {
+                borrowFromRight(pai, i);
+                return;
+            }
+        }
+        // não dá pra emprestar: merge
+        if (i > 0) mergeWithLeft(pai, i);
+        else       mergeWithRight(pai, i);
+    }
+
+    /** filho[i] recebe a chave pai.ids[i-1]; esq perde a última chave. */
+    private void borrowFromLeft(No pai, int i) throws IOException {
+        No esq = leNo(pai.filhos[i - 1]);
+        No filho = leNo(pai.filhos[i]);
+
+        // abre espaço no filho (chaves)
+        for (int j = filho.n; j > 0; j--) {
+            filho.ids[j] = filho.ids[j - 1];
+            filho.enderecos[j] = filho.enderecos[j - 1];
+        }
+        // abre espaço nos filhos (se interno)
+        if (!filho.folha()) {
+            for (int j = filho.n + 1; j > 0; j--) {
+                filho.filhos[j] = filho.filhos[j - 1];
+            }
+            filho.filhos[0] = esq.filhos[esq.n];
+        }
+
+        // chave do pai desce pro início do filho
+        filho.ids[0] = pai.ids[i - 1];
+        filho.enderecos[0] = pai.enderecos[i - 1];
+        filho.n++;
+
+        // última chave do irmão esquerdo sobe
+        pai.ids[i - 1] = esq.ids[esq.n - 1];
+        pai.enderecos[i - 1] = esq.enderecos[esq.n - 1];
+        esq.n--;
+
+        escreveNo(esq);
+        escreveNo(filho);
+        escreveNo(pai);
+    }
+
+    /** filho[i] recebe a chave pai.ids[i]; dir perde a primeira chave. */
+    private void borrowFromRight(No pai, int i) throws IOException {
+        No dir = leNo(pai.filhos[i + 1]);
+        No filho = leNo(pai.filhos[i]);
+
+        // chave do pai desce pro fim do filho
+        filho.ids[filho.n] = pai.ids[i];
+        filho.enderecos[filho.n] = pai.enderecos[i];
+        if (!filho.folha()) {
+            filho.filhos[filho.n + 1] = dir.filhos[0];
+        }
+        filho.n++;
+
+        // primeira chave do irmão direito sobe
+        pai.ids[i] = dir.ids[0];
+        pai.enderecos[i] = dir.enderecos[0];
+
+        // desloca o irmão direito pra esquerda
+        for (int j = 0; j < dir.n - 1; j++) {
+            dir.ids[j] = dir.ids[j + 1];
+            dir.enderecos[j] = dir.enderecos[j + 1];
+        }
+        if (!dir.folha()) {
+            for (int j = 0; j < dir.n; j++) {
+                dir.filhos[j] = dir.filhos[j + 1];
+            }
+            dir.filhos[dir.n] = -1;
+        }
+        dir.n--;
+
+        escreveNo(dir);
+        escreveNo(filho);
+        escreveNo(pai);
+    }
+
+    /**
+     * Merge de filhos[i], pai.ids[i] e filhos[i+1] -> filhos[i].
+     * O pai perde a chave i e o filho i+1.
+     */
+    private void mergeWithRight(No pai, int i) throws IOException {
+        No esq = leNo(pai.filhos[i]);
+        No dir = leNo(pai.filhos[i + 1]);
+        int esqN = esq.n;
+
+        // chave do meio desce
+        esq.ids[esqN] = pai.ids[i];
+        esq.enderecos[esqN] = pai.enderecos[i];
+        esq.n++;
+
+        // copia chaves do irmão direito
+        for (int j = 0; j < dir.n; j++) {
+            esq.ids[esq.n] = dir.ids[j];
+            esq.enderecos[esq.n] = dir.enderecos[j];
+            esq.n++;
+        }
+        // copia filhos do irmão direito
+        if (!esq.folha()) {
+            for (int j = 0; j <= dir.n; j++) {
+                esq.filhos[esqN + 1 + j] = dir.filhos[j];
+            }
+        }
+
+        // remove chave i e filho i+1 do pai
+        for (int j = i; j < pai.n - 1; j++) {
+            pai.ids[j] = pai.ids[j + 1];
+            pai.enderecos[j] = pai.enderecos[j + 1];
+        }
+        for (int j = i + 1; j < pai.n; j++) {
+            pai.filhos[j] = pai.filhos[j + 1];
+        }
+        pai.filhos[pai.n] = -1;
+        pai.n--;
+
+        escreveNo(esq);
+        escreveNo(pai);
+        // o nó 'dir' fica órfão no arquivo — não é referenciado mais.
+    }
+
+    private void mergeWithLeft(No pai, int i) throws IOException {
+        mergeWithRight(pai, i - 1);
+    }
+
+    /** Chave mais à direita da subárvore. */
+    private void getPredecessor(long pos, int[] outId, long[] outEnd) throws IOException {
+        No no = leNo(pos);
+        while (!no.folha()) {
+            no = leNo(no.filhos[no.n]);
+        }
+        outId[0] = no.ids[no.n - 1];
+        outEnd[0] = no.enderecos[no.n - 1];
+    }
+
+    /** Chave mais à esquerda da subárvore. */
+    private void getSuccessor(long pos, int[] outId, long[] outEnd) throws IOException {
+        No no = leNo(pos);
+        while (!no.folha()) {
+            no = leNo(no.filhos[0]);
+        }
+        outId[0] = no.ids[0];
+        outEnd[0] = no.enderecos[0];
     }
 
     public void close() throws IOException {

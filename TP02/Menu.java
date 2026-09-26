@@ -1,6 +1,7 @@
 package TP02;
 
 import java.util.Scanner;
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
@@ -12,8 +13,9 @@ public class Menu {
         int opção = -1;
         
         Scanner scanner = new Scanner(System.in);
-        Path fonte = Paths.get("TP01/livros.bin");
+        Path fonte = Paths.get("TP02/livros.bin");
         RandomAccessFile raf = new RandomAccessFile(fonte.toString(), "rw");
+        ArvoreBMais arvore = new ArvoreBMais(new File("TP02/arvore.bin"));
 
                 // Loop do CRUD, roda até o usuário escolher sair (0)
 
@@ -22,23 +24,28 @@ public class Menu {
             System.out.println("1 - CRUD");
             System.out.println("2 - Ordenar");
             System.out.println("0 - Sair");
-            System.out.print("Escolha uma opção: ");
 
-            opção = Integer.parseInt(scanner.nextLine());
+            opção = lerInteiro(scanner, "Escolha uma opção: ");
 
             switch (opção) {
                 case 1:
-                    menuCRUD(raf, scanner);
+                    menuCRUD(raf, arvore, scanner);
                     break;
                 case 2:
                     /*fecha o arquivo antes de ordenar, pois mexe diretamente nele, e reabre depois de terminar */
                     raf.close();
+                    arvore.close();
 
                     int numCaminhos = lerInteiroPositivo(scanner, "Número de caminhos (mínimo 2): ", 2);
                     int maxRegistros = lerInteiroPositivo(scanner, "Número máximo de registros em memória primária: ", 1);
 
                     Ordenacao.main(fonte, numCaminhos, maxRegistros);
+
                     raf = new RandomAccessFile(fonte.toString(), "rw");
+                    arvore = new ArvoreBMais(new File("TP02/arvore.bin"));
+                    System.out.println("Atualizando posições na árvore B...");
+                    atualizarPosicoesNaArvore(raf, arvore);
+                    System.out.println("Árvore B atualizada.");
                     break;
                 case 0:
                     System.out.println("Fechando o programa");
@@ -48,6 +55,7 @@ public class Menu {
             }
         }
         raf.close();
+        arvore.close();
         scanner.close();
     }
 
@@ -67,7 +75,7 @@ public class Menu {
         }
     }
     //menu do CRUD
-    private static void menuCRUD(RandomAccessFile raf, Scanner scanner) throws IOException {
+    private static void menuCRUD(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
         
         int opção = -1;
 
@@ -78,22 +86,21 @@ public class Menu {
             System.out.println("3 - Atualizar livro");
             System.out.println("4 - Deletar livro");
             System.out.println("0 - Voltar");
-            System.out.print("Escolha uma opção: ");
-
-            opção = Integer.parseInt(scanner.nextLine());
+            
+            opção = lerInteiro(scanner, "Escolha uma opção: ");
 
             switch (opção) {
                 case 1:
-                    create(raf, scanner);
+                    create(raf, arvore, scanner);
                     break;
                 case 2:
-                    read(raf, scanner); 
+                    read(raf, arvore, scanner); 
                     break;
                 case 3:
-                    update(raf, scanner);
+                    update(raf, arvore, scanner);
                     break;
                 case 4:
-                    delete(raf, scanner); 
+                    delete(raf, arvore, scanner); 
                     break;
                 case 0:
                     break;
@@ -104,7 +111,7 @@ public class Menu {
     }
 
     // pega os dados de um novo registro pelo terminal e chama CRUD.create para gravar no arquivo
-    private static void create(RandomAccessFile raf, Scanner scanner) throws IOException {
+    private static void create(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
         System.out.println("\n--- Inserir novo livro ---");
 
         System.out.print("Título: ");
@@ -187,17 +194,16 @@ public class Menu {
             }
         }
         // id é gerado dentro do CRUD.create, não é definido pelo usuário
-        int idGerado = CRUD.create(raf, livro);
+        int idGerado = CRUD.create(raf, arvore, livro);
         System.out.println("Livro inserido! ID: " + idGerado);
     }
 
     //busca e exibe o registro de um livro pelo id, se existir
-    private static void read(RandomAccessFile raf, Scanner scanner) throws IOException {
+    private static void read(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
         System.out.println("\n--- Buscar livro ---");
-        System.out.print("Id do livro: ");
-        int id = Integer.parseInt(scanner.nextLine());
+        int id = lerInteiro(scanner, "Id do livro: ");
 
-        Livro livro = CRUD.read(raf, id);
+        Livro livro = CRUD.read(raf, arvore, id);
 
         if (livro == null) {
             System.out.println("Livro não encontrado (ou deletado)");
@@ -208,12 +214,11 @@ public class Menu {
 
 //atualiza um livro existente, permitindo manter os valores atuais ao apertar enter em cada campo
 
-    private static void update(RandomAccessFile raf, Scanner scanner) throws IOException {
+    private static void update(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
         System.out.println("\n--- Atualizar livro ---");
-        System.out.print("Id do livro: ");
-        int id = Integer.parseInt(scanner.nextLine());
+        int id = lerInteiro(scanner, "Id do livro: ");
 
-        Livro livroAtual = CRUD.read(raf, id);
+        Livro livroAtual = CRUD.read(raf, arvore, id);
         if (livroAtual == null) {
             System.out.println("Livro não encontrado");
             return;
@@ -337,7 +342,7 @@ public class Menu {
             }
         }
 
-        boolean atualizou = CRUD.update(raf, id, livroNovo);
+        boolean atualizou = CRUD.update(raf, arvore, id, livroNovo);
         if (atualizou) {
             System.out.println("Livro atualizado com sucesso!");
         } else {
@@ -346,17 +351,50 @@ public class Menu {
     }
 
     // deleta logicamente um livro pelo id digitado
-    private static void delete(RandomAccessFile raf, Scanner scanner) throws IOException {
+    private static void delete(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
         System.out.println("\n--- Deletar livro ---");
-        System.out.print("Id do livro: ");
-        int id = Integer.parseInt(scanner.nextLine());
+        int id = lerInteiro(scanner, "Id do livro: ");
 
-        boolean deletou = CRUD.delete(raf, id);
+        boolean deletou = CRUD.delete(raf, arvore, id);
 
         if (deletou) {
             System.out.println("Livro deletado com sucesso");
         } else {
             System.out.println("Livro não encontrado");
+        }
+    }
+
+    // lê um inteiro do usuário, repetindo até ser válido
+    private static int lerInteiro(Scanner scanner, String mensagem) {
+        while (true) {
+            System.out.print(mensagem);
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número inteiro válido.");
+            }
+        }
+    }
+
+    /**
+     * Atualiza as posições na árvore B varrendo sequencialmente o arquivo de dados.
+     */
+    private static void atualizarPosicoesNaArvore(RandomAccessFile raf,
+                                              ArvoreBMais arvore) throws IOException {
+        raf.seek(4);                       // pula o cabeçalho
+        long tamanhoArquivo = raf.length();
+
+        while (raf.getFilePointer() < tamanhoArquivo) {
+            long posicao = raf.getFilePointer();   // onde o registro começa
+
+            int id = raf.readInt();
+            int tamanho = raf.readInt();
+
+            // pula lápide (1 byte) + corpo do registro
+            raf.seek(posicao + 8 + tamanho);
+
+            // atualiza o endereço da chave na árvore (uma descida em disco)
+            arvore.atualiza(id, posicao);
         }
     }
 }
