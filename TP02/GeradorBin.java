@@ -13,18 +13,25 @@ public class GeradorBin {
         BufferedReader br;
         RandomAccessFile rafLivros;
         File arqArvore;
-        ArvoreBMais arvore;
+        ArvoreB arvore;
 
         try {
             // ---------- entrada: ordem da árvore ----------
             Scanner sc = new Scanner(System.in);
             System.out.print("Ordem da Árvore B: ");
             String input = sc.nextLine();
-            Integer ordem = tryParse(input);
+            Integer ordem = null;
             while (ordem == null || ordem < 3) {
-                System.out.print("A Ordem da Árvore B precisa ser um inteiro maior ou igual a 3: ");
-                input = sc.nextLine();
-                ordem = tryParse(input);
+                try {
+                    ordem = Integer.parseInt(input);
+                    if (ordem < 3) {
+                        System.out.print("A Ordem da Árvore B precisa ser um inteiro maior ou igual a 3: ");
+                        input = sc.nextLine();
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.print("A Ordem da Árvore B precisa ser um inteiro maior ou igual a 3: ");
+                    input = sc.nextLine();
+                }
             }
 
             // ---------- abrir arquivos ----------
@@ -35,7 +42,17 @@ public class GeradorBin {
             rafLivros.writeInt(0);         // placeholder do número de livros (posição 0..3)
 
             arqArvore = new File("TP02/arvore.bin");
-            arvore = new ArvoreBMais(arqArvore, ordem);
+            arvore = new ArvoreB(arqArvore, ordem);
+
+            // ---------- (re)cria as listas invertidas do zero ----------
+            // apaga os arquivos anteriores para evitar manter dados de uma carga antiga
+            File arqListaEditora = new File("TP02/lista_editora.txt");
+            File arqListaGenero = new File("TP02/lista_genero.txt");
+            if (arqListaEditora.exists()) arqListaEditora.delete();
+            if (arqListaGenero.exists()) arqListaGenero.delete();
+            // cria as listas que vão relacionar editoras e gêneros aos ids dos livros
+            ListaInvertida listaEditora = new ListaInvertida(arqListaEditora);
+            ListaInvertida listaGenero = new ListaInvertida(arqListaGenero);
 
             // ---------- laço de geração ----------
             br.readLine(); // cabeçalho do CSV
@@ -110,6 +127,15 @@ public class GeradorBin {
                 // >>> insere no índice B-Tree
                 arvore.insere(livro.getId(), posicao);
 
+                // >>> insere nas listas invertidas (sem persistir a cada registro,
+                // pra não reescrever o arquivo inteiro milhares de vezes)
+                // adiciona o id do livro à lista associada à editora
+                listaEditora.insereSemSalvar(livro.getEditora(), livro.getId());
+                // adiciona o id do livro às listas de cada gênero
+                for (String genero : livro.getGeneros()) {
+                    listaGenero.insereSemSalvar(genero, livro.getId());
+                }
+
                 System.out.println(livro);
 
                 linha = br.readLine();
@@ -118,6 +144,10 @@ public class GeradorBin {
             // ---------- finalização ----------
             rafLivros.seek(0);
             rafLivros.writeInt(i - 1); // número total de livros
+
+            // persiste as listas invertidas de uma vez só, agora que a carga acabou
+            listaEditora.salvar();
+            listaGenero.salvar();
 
             rafLivros.close();
             arvore.close();
@@ -157,15 +187,5 @@ public class GeradorBin {
 
         campos.add(campo.toString().trim());
         return campos.toArray(new String[0]);
-    }
-
-    // Source - https://stackoverflow.com/a/1486082
-    // Posted by Jon Skeet, modified by community.
-    public static Integer tryParse(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

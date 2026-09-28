@@ -1,6 +1,8 @@
 package TP02;
 
 import java.util.Scanner;
+import java.util.List;
+import java.util.Set;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -15,7 +17,11 @@ public class Menu {
         Scanner scanner = new Scanner(System.in);
         Path fonte = Paths.get("TP02/livros.bin");
         RandomAccessFile raf = new RandomAccessFile(fonte.toString(), "rw");
-        ArvoreBMais arvore = new ArvoreBMais(new File("TP02/arvore.bin"));
+        ArvoreB arvore = new ArvoreB(new File("TP02/arvore.bin"));
+
+        //listas invertidas de editora e gênero, usadas na busca por índice secundário
+        ListaInvertida listaEditora = new ListaInvertida(new File("TP02/lista_editora.txt"));
+        ListaInvertida listaGenero = new ListaInvertida(new File("TP02/lista_genero.txt"));
 
                 // Loop do CRUD, roda até o usuário escolher sair (0)
 
@@ -29,7 +35,7 @@ public class Menu {
 
             switch (opção) {
                 case 1:
-                    menuCRUD(raf, arvore, scanner);
+                    menuCRUD(raf, arvore, listaEditora, listaGenero, scanner);
                     break;
                 case 2:
                     /*fecha o arquivo antes de ordenar, pois mexe diretamente nele, e reabre depois de terminar */
@@ -42,7 +48,7 @@ public class Menu {
                     Ordenacao.main(fonte, numCaminhos, maxRegistros);
 
                     raf = new RandomAccessFile(fonte.toString(), "rw");
-                    arvore = new ArvoreBMais(new File("TP02/arvore.bin"));
+                    arvore = new ArvoreB(new File("TP02/arvore.bin"));
                     System.out.println("Atualizando posições na árvore B...");
                     atualizarPosicoesNaArvore(raf, arvore);
                     System.out.println("Árvore B atualizada.");
@@ -56,6 +62,8 @@ public class Menu {
         }
         raf.close();
         arvore.close();
+        listaEditora.close();
+        listaGenero.close();
         scanner.close();
     }
 
@@ -75,7 +83,9 @@ public class Menu {
         }
     }
     //menu do CRUD
-    private static void menuCRUD(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
+    private static void menuCRUD(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
         
         int opção = -1;
 
@@ -85,22 +95,26 @@ public class Menu {
             System.out.println("2 - Buscar livro (pelo ID)");
             System.out.println("3 - Atualizar livro");
             System.out.println("4 - Deletar livro");
+            System.out.println("5 - Buscar por Lista Invertida (Editora / Gênero)");
             System.out.println("0 - Voltar");
             
             opção = lerInteiro(scanner, "Escolha uma opção: ");
 
             switch (opção) {
                 case 1:
-                    create(raf, arvore, scanner);
+                    create(raf, arvore, listaEditora, listaGenero, scanner);
                     break;
                 case 2:
                     read(raf, arvore, scanner); 
                     break;
                 case 3:
-                    update(raf, arvore, scanner);
+                    update(raf, arvore, listaEditora, listaGenero, scanner);
                     break;
                 case 4:
-                    delete(raf, arvore, scanner); 
+                    delete(raf, arvore, listaEditora, listaGenero, scanner); 
+                    break;
+                case 5:
+                    buscarPorListaInvertida(raf, arvore, listaEditora, listaGenero, scanner);
                     break;
                 case 0:
                     break;
@@ -111,7 +125,9 @@ public class Menu {
     }
 
     // pega os dados de um novo registro pelo terminal e chama CRUD.create para gravar no arquivo
-    private static void create(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
+    private static void create(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
         System.out.println("\n--- Inserir novo livro ---");
 
         System.out.print("Título: ");
@@ -194,12 +210,12 @@ public class Menu {
             }
         }
         // id é gerado dentro do CRUD.create, não é definido pelo usuário
-        int idGerado = CRUD.create(raf, arvore, livro);
+        int idGerado = CRUD.create(raf, arvore, listaEditora, listaGenero, livro);
         System.out.println("Livro inserido! ID: " + idGerado);
     }
 
     //busca e exibe o registro de um livro pelo id, se existir
-    private static void read(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
+    private static void read(RandomAccessFile raf, ArvoreB arvore, Scanner scanner) throws IOException {
         System.out.println("\n--- Buscar livro ---");
         int id = lerInteiro(scanner, "Id do livro: ");
 
@@ -214,7 +230,9 @@ public class Menu {
 
 //atualiza um livro existente, permitindo manter os valores atuais ao apertar enter em cada campo
 
-    private static void update(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
+    private static void update(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
         System.out.println("\n--- Atualizar livro ---");
         int id = lerInteiro(scanner, "Id do livro: ");
 
@@ -342,7 +360,7 @@ public class Menu {
             }
         }
 
-        boolean atualizou = CRUD.update(raf, arvore, id, livroNovo);
+        boolean atualizou = CRUD.update(raf, arvore, listaEditora, listaGenero, id, livroNovo);
         if (atualizou) {
             System.out.println("Livro atualizado com sucesso!");
         } else {
@@ -351,16 +369,81 @@ public class Menu {
     }
 
     // deleta logicamente um livro pelo id digitado
-    private static void delete(RandomAccessFile raf, ArvoreBMais arvore, Scanner scanner) throws IOException {
+    private static void delete(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
         System.out.println("\n--- Deletar livro ---");
         int id = lerInteiro(scanner, "Id do livro: ");
 
-        boolean deletou = CRUD.delete(raf, arvore, id);
+        boolean deletou = CRUD.delete(raf, arvore, listaEditora, listaGenero, id);
 
         if (deletou) {
             System.out.println("Livro deletado com sucesso");
         } else {
             System.out.println("Livro não encontrado");
+        }
+    }
+
+    //busca por editora e/ou gênero, podendo combinar as duas com AND ou OR
+    private static void buscarPorListaInvertida(RandomAccessFile raf, ArvoreB arvore,
+                                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                                Scanner scanner) throws IOException {
+        System.out.println("\n--- Busca por Lista Invertida ---");
+        System.out.println("1 - Buscar por Editora");
+        System.out.println("2 - Buscar por Gênero");
+        System.out.println("3 - Buscar por Editora E Gênero (interseção)");
+        System.out.println("4 - Buscar por Editora OU Gênero (união)");
+        int opcao = lerInteiro(scanner, "Escolha uma opção: ");
+
+        Set<Integer> idsEncontrados;
+
+        switch (opcao) {
+            case 1: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                idsEncontrados = listaEditora.busca(editora);
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora.");
+                break;
+            }
+            case 2: {
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = listaGenero.busca(genero);
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Gênero.");
+                break;
+            }
+            case 3: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = CRUD.interseccao(listaEditora.busca(editora), listaGenero.busca(genero));
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora AND Lista Invertida de Gênero.");
+                break;
+            }
+            case 4: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = CRUD.uniao(listaEditora.busca(editora), listaGenero.busca(genero));
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora OR Lista Invertida de Gênero.");
+                break;
+            }
+            default:
+                System.out.println("Opção inválida");
+                return;
+        }
+
+        if (idsEncontrados.isEmpty()) {
+            System.out.println("Nenhum livro encontrado.");
+            return;
+        }
+
+        List<Livro> livros = CRUD.buscaPorIds(raf, arvore, idsEncontrados);
+        System.out.println(livros.size() + " livro(s) encontrado(s):");
+        for (Livro l : livros) {
+            System.out.println(l);
         }
     }
 
@@ -380,7 +463,7 @@ public class Menu {
      * Atualiza as posições na árvore B varrendo sequencialmente o arquivo de dados.
      */
     private static void atualizarPosicoesNaArvore(RandomAccessFile raf,
-                                              ArvoreBMais arvore) throws IOException {
+                                            ArvoreB arvore) throws IOException {
         raf.seek(4);                       // pula o cabeçalho
         long tamanhoArquivo = raf.length();
 
