@@ -1,0 +1,537 @@
+package TP03;
+
+import java.util.Scanner;
+import java.util.List;
+import java.util.Set;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+public class Menu {
+        
+    public static void main(String[] args) throws IOException {
+        int opção = -1;
+        
+        Scanner scanner = new Scanner(System.in);
+        Path fonte = Paths.get("TP03/livros.bin");
+
+        // arquivos de índice do TP2 (Árvore B + listas invertidas)
+        File arqArvore = new File("TP03/arvore.bin");
+        File arqListaEditora = new File("TP03/lista_editora.txt");
+        File arqListaGenero = new File("TP03/lista_genero.txt");
+
+        // TP3: se os índices ainda não existem nesta pasta, reconstrói a partir do livros.bin
+        if (!arqArvore.exists() || !arqListaEditora.exists() || !arqListaGenero.exists()) {
+            System.out.println("Índices não encontrados em TP03/. Eles serão reconstruídos a partir de livros.bin.");
+            int ordem = lerInteiroPositivo(scanner, "Ordem da Árvore B (mínimo 3): ", 3);
+            Reindexacao.reconstruir(fonte, arqArvore, ordem, arqListaEditora, arqListaGenero);
+            System.out.println("Índices reconstruídos.");
+        }
+
+        RandomAccessFile raf = new RandomAccessFile(fonte.toString(), "rw");
+        ArvoreB arvore = new ArvoreB(new File("TP03/arvore.bin"));
+
+        //listas invertidas de editora e gênero, usadas na busca por índice secundário
+        ListaInvertida listaEditora = new ListaInvertida(new File("TP03/lista_editora.txt"));
+        ListaInvertida listaGenero = new ListaInvertida(new File("TP03/lista_genero.txt"));
+
+                // Loop do CRUD, roda até o usuário escolher sair (0)
+
+        while (opção != 0) {
+            System.out.println("\n===== SISTEMA GERENCIADOR DE BANCO DE DADOS - LIVROS =====");
+            System.out.println("1 - CRUD");
+            System.out.println("2 - Ordenar");
+            System.out.println("3 - Compactar base de dados (Huffman e LZW)");
+            System.out.println("4 - Descompactar base de dados");
+            System.out.println("5 - Casamento de padrões (KMP / Boyer-Moore)");
+            System.out.println("0 - Sair");
+
+            opção = lerInteiro(scanner, "Escolha uma opção: ");
+
+            switch (opção) {
+                case 1:
+                    menuCRUD(raf, arvore, listaEditora, listaGenero, scanner);
+                    break;
+                case 2:
+                    /*fecha o arquivo antes de ordenar, pois mexe diretamente nele, e reabre depois de terminar */
+                    raf.close();
+                    arvore.close();
+
+                    int numCaminhos = lerInteiroPositivo(scanner, "Número de caminhos (mínimo 2): ", 2);
+                    int maxRegistros = lerInteiroPositivo(scanner, "Número máximo de registros em memória primária: ", 1);
+
+                    Ordenacao.main(fonte, numCaminhos, maxRegistros);
+
+                    raf = new RandomAccessFile(fonte.toString(), "rw");
+                    arvore = new ArvoreB(new File("TP03/arvore.bin"));
+                    System.out.println("Atualizando posições na árvore B...");
+                    atualizarPosicoesNaArvore(raf, arvore);
+                    System.out.println("Árvore B atualizada.");
+                    break;
+                case 3:
+                    // a compressão só lê o arquivo de dados, então não precisa fechar nada
+                    Compressao.comprimirBase(fonte);
+                    break;
+                case 4: {
+                    List<Integer> versoes = Compressao.versoesExistentes(fonte);
+                    if (versoes.isEmpty()) {
+                        System.out.println("Ainda não existe nenhuma versão compactada. Use a opção 3 primeiro.");
+                        break;
+                    }
+                    System.out.println("Versões disponíveis: " + versoes);
+                    int versao = lerInteiroPositivo(scanner, "Versão (X) a descompactar: ", 1);
+
+                    // o arquivo de dados vai ser substituído: fecha tudo antes (mesmo cuidado da ordenação)
+                    int ordemArvore = arvore.getOrdem();
+                    raf.close();
+                    arvore.close();
+                    listaEditora.close();
+                    listaGenero.close();
+
+                    boolean substituiu = Compressao.descomprimirBase(fonte, versao);
+                    if (substituiu) {
+                        // o arquivo restaurado pode ser diferente do que estava em uso: refaz os índices
+                        System.out.println("Reconstruindo Árvore B e listas invertidas...");
+                        Reindexacao.reconstruir(fonte, arqArvore, ordemArvore, arqListaEditora, arqListaGenero);
+                        System.out.println("Índices reconstruídos.");
+                    }
+
+                    raf = new RandomAccessFile(fonte.toString(), "rw");
+                    arvore = new ArvoreB(arqArvore);
+                    listaEditora = new ListaInvertida(arqListaEditora);
+                    listaGenero = new ListaInvertida(arqListaGenero);
+                    break;
+                }
+                case 5:
+                    CasamentoPadroes.menu(raf, scanner);
+                    break;
+                case 0:
+                    System.out.println("Fechando o programa");
+                    break;
+                default:
+                    System.out.println("Opção inválida");
+            }
+        }
+        raf.close();
+        arvore.close();
+        listaEditora.close();
+        listaGenero.close();
+        scanner.close();
+    }
+
+       // lê um inteiro do usuário, repetindo até ser válido e maior/igual ao mínimo exigido
+    private static int lerInteiroPositivo(Scanner scanner, String mensagem, int minimo) {
+        while (true) {
+            System.out.print(mensagem);
+            try {
+                int valor = Integer.parseInt(scanner.nextLine());
+                if (valor >= minimo) {
+                    return valor;
+                }
+                System.out.println("Digite um valor maior ou igual a " + minimo);
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+    }
+    //menu do CRUD
+    private static void menuCRUD(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
+        
+        int opção = -1;
+
+        while (opção != 0) {
+            System.out.println("\n----- CRUD -----");
+            System.out.println("1 - Inserir um novo livro");
+            System.out.println("2 - Buscar livro (pelo ID)");
+            System.out.println("3 - Atualizar livro");
+            System.out.println("4 - Deletar livro");
+            System.out.println("5 - Buscar por Lista Invertida (Editora / Gênero)");
+            System.out.println("0 - Voltar");
+            
+            opção = lerInteiro(scanner, "Escolha uma opção: ");
+
+            switch (opção) {
+                case 1:
+                    create(raf, arvore, listaEditora, listaGenero, scanner);
+                    break;
+                case 2:
+                    read(raf, arvore, scanner); 
+                    break;
+                case 3:
+                    update(raf, arvore, listaEditora, listaGenero, scanner);
+                    break;
+                case 4:
+                    delete(raf, arvore, listaEditora, listaGenero, scanner); 
+                    break;
+                case 5:
+                    buscarPorListaInvertida(raf, arvore, listaEditora, listaGenero, scanner);
+                    break;
+                case 0:
+                    break;
+                default:
+                    System.out.println("opção inválida");
+            }
+        }
+    }
+
+    // pega os dados de um novo registro pelo terminal e chama CRUD.create para gravar no arquivo
+    private static void create(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
+        System.out.println("\n--- Inserir novo livro ---");
+
+        System.out.print("Título: ");
+        String titulo = scanner.nextLine();
+
+        System.out.print("Autor(es) (separados por vírgula): ");
+        String[] autores = scanner.nextLine().split(",");
+
+        //valida a entrada de páginas, repetindo até o usuário digitar um número válido
+        int paginas = 0;
+        while (true) {
+            System.out.print("Número de páginas: ");
+            try {
+                paginas = Integer.parseInt(scanner.nextLine());
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+
+        System.out.print("Gêneros (separados por vírgula): ");
+        String[] generos = scanner.nextLine().split(",");
+
+        //ideia: colocar um limite de caracteres aqui
+        System.out.print("Descrição (até 500 caracteres): ");
+        String descricao = scanner.nextLine();
+
+        System.out.print("Editora: ");
+        String editora = scanner.nextLine();
+
+        String lingua;
+        while (true) {
+            System.out.print("Idioma (2 caracteres, ex: en, pt): ");
+            lingua = scanner.nextLine();
+            //valida que tem exatamente 2 caracteres
+            if (lingua.length() == 2) {
+                break;
+            }
+            System.out.println("O idioma precisa ter exatamente 2 caracteres, digite novamente");
+        }
+
+        float mediaReviews = 0;
+        while (true) {
+            System.out.print("Média das reviews (em ponto): ");
+            //valida se é um número decimal
+            try {
+                mediaReviews = Float.parseFloat(scanner.nextLine());
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido (ex: 4.5)");
+            }
+        }
+
+        int qtdReviews = 0;
+        while (true) {
+            System.out.print("Quantidade de reviews: ");
+            //valida como um número inteiro
+            try {
+                qtdReviews = Integer.parseInt(scanner.nextLine());
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+
+        System.out.print("Thumbnail (URL): ");
+        String thumbnail = scanner.nextLine();
+
+        Livro livro = null;
+        while (livro == null) {
+            //*******************************************************olhar aqui
+            System.out.print("Data de publicação (yyyy/MM/dd, yyyy-MM-dd, yyyy-MM, yyyy ou Unknown): ");
+            String dataPublicacao = scanner.nextLine();
+
+            try {
+                livro = new Livro(-1, titulo, autores, paginas, generos, descricao,
+                                dataPublicacao, editora, lingua, mediaReviews, qtdReviews, thumbnail);
+            } catch (Exception e) {
+                System.out.println("Data inválida, tente novamente (" + e.getMessage() + ")");
+            }
+        }
+        // id é gerado dentro do CRUD.create, não é definido pelo usuário
+        int idGerado = CRUD.create(raf, arvore, listaEditora, listaGenero, livro);
+        System.out.println("Livro inserido! ID: " + idGerado);
+    }
+
+    //busca e exibe o registro de um livro pelo id, se existir
+    private static void read(RandomAccessFile raf, ArvoreB arvore, Scanner scanner) throws IOException {
+        System.out.println("\n--- Buscar livro ---");
+        int id = lerInteiro(scanner, "Id do livro: ");
+
+        Livro livro = CRUD.read(raf, arvore, id);
+
+        if (livro == null) {
+            System.out.println("Livro não encontrado (ou deletado)");
+        } else {
+            System.out.println(livro);
+        }
+    }
+
+//atualiza um livro existente, permitindo manter os valores atuais ao apertar enter em cada campo
+
+    private static void update(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
+        System.out.println("\n--- Atualizar livro ---");
+        int id = lerInteiro(scanner, "Id do livro: ");
+
+        Livro livroAtual = CRUD.read(raf, arvore, id);
+        if (livroAtual == null) {
+            System.out.println("Livro não encontrado");
+            return;
+        }
+
+        System.out.println("Dados atuais:");
+        System.out.println(livroAtual);
+        System.out.println("\nDigite os novos dados (Enter mantém o valor atual em todos os campos):");
+
+        System.out.print("Título [" + livroAtual.getTitulo() + "]: ");
+        String tituloInput = scanner.nextLine();
+        String titulo = tituloInput.isEmpty() ? livroAtual.getTitulo() : tituloInput;
+
+        String autoresAtuais = String.join(",", livroAtual.getAutores());
+        System.out.print("Autores separados por vírgula [" + autoresAtuais + "]: ");
+        String autoresInput = scanner.nextLine();
+        String[] autores = autoresInput.isEmpty() ? livroAtual.getAutores() : autoresInput.split(",");
+
+        //aqui verifica os números preenchidos para ver se são válidos
+        int paginas = livroAtual.getPaginas();
+        while (true) {
+            System.out.print("Número de páginas [" + livroAtual.getPaginas() + "]: ");
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                break; 
+            }
+            try {
+                paginas = Integer.parseInt(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+
+        String generosAtuais = String.join(",", livroAtual.getGeneros());
+        System.out.print("Gêneros separados por vírgula [" + generosAtuais + "]: ");
+        String generosInput = scanner.nextLine();
+        String[] generos = generosInput.isEmpty() ? livroAtual.getGeneros() : generosInput.split(",");
+
+        //valida o tamanho máximo da descrição apenas se o usuário digitar de novo
+        String descricao = livroAtual.getDescricao();
+        while (true) {
+            System.out.print("Descrição (até 500 caracteres) [manter atual]: ");
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                break;
+            }
+            if (input.length() <= 550) {
+                descricao = input;
+                break;
+            }
+            System.out.println("Descrição muito longa (" + input.length() + " caracteres)");
+        }
+
+        System.out.print("Editora [" + livroAtual.getEditora() + "]: ");
+        String editoraInput = scanner.nextLine();
+        String editora = editoraInput.isEmpty() ? livroAtual.getEditora() : editoraInput;
+
+        //se digitar algo novo, verifica se possui 2 caracteres
+        String lingua = livroAtual.getLingua();
+        while (true) {
+            System.out.print("Língua (2 caracteres) [" + livroAtual.getLingua() + "]: ");
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                break;
+            }
+            if (input.length() == 2) {
+                lingua = input;
+                break;
+            }
+            System.out.println("A língua precisa ter exatamente 2 caracteres");
+        }
+
+        float mediaReviews = livroAtual.getMediaReviews();
+        while (true) {
+            System.out.print("Média das reviews [" + livroAtual.getMediaReviews() + "]: ");
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                break;
+            }
+            try {
+                mediaReviews = Float.parseFloat(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido (ex: 4.5)");
+            }
+        }
+
+        int qtdReviews = livroAtual.getQtdReviews();
+        while (true) {
+            System.out.print("Quantidade de reviews [" + livroAtual.getQtdReviews() + "]: ");
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                break;
+            }
+            try {
+                qtdReviews = Integer.parseInt(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número válido");
+            }
+        }
+
+        System.out.print("Thumbnail [" + livroAtual.getThumbnail() + "]: ");
+        String thumbnailInput = scanner.nextLine();
+        String thumbnail = thumbnailInput.isEmpty() ? livroAtual.getThumbnail() : thumbnailInput;
+
+        Livro livroNovo = null;
+        while (livroNovo == null) {
+            System.out.print("Data de publicação (yyyy-MM-dd, yyyy-MM, yyyy ou Unknown) [manter atual]: ");
+            String dataInput = scanner.nextLine();
+            String dataPublicacao = dataInput.isEmpty()
+                ? livroAtual.DataPublicacaoToString(livroAtual.getDataPublicacao())
+                : dataInput;
+
+            try {
+                livroNovo = new Livro(id, titulo, autores, paginas, generos, descricao,
+                                    dataPublicacao, editora, lingua, mediaReviews, qtdReviews, thumbnail);
+            } catch (Exception e) {
+                System.out.println("Data inválida, tente novamente (" + e.getMessage() + ")");
+            }
+        }
+
+        boolean atualizou = CRUD.update(raf, arvore, listaEditora, listaGenero, id, livroNovo);
+        if (atualizou) {
+            System.out.println("Livro atualizado com sucesso!");
+        } else {
+            System.out.println("Livro não encontrado");
+        }
+    }
+
+    // deleta logicamente um livro pelo id digitado
+    private static void delete(RandomAccessFile raf, ArvoreB arvore,
+                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                Scanner scanner) throws IOException {
+        System.out.println("\n--- Deletar livro ---");
+        int id = lerInteiro(scanner, "Id do livro: ");
+
+        boolean deletou = CRUD.delete(raf, arvore, listaEditora, listaGenero, id);
+
+        if (deletou) {
+            System.out.println("Livro deletado com sucesso");
+        } else {
+            System.out.println("Livro não encontrado");
+        }
+    }
+
+    //busca por editora e/ou gênero, podendo combinar as duas com AND ou OR
+    private static void buscarPorListaInvertida(RandomAccessFile raf, ArvoreB arvore,
+                                                ListaInvertida listaEditora, ListaInvertida listaGenero,
+                                                Scanner scanner) throws IOException {
+        System.out.println("\n--- Busca por Lista Invertida ---");
+        System.out.println("1 - Buscar por Editora");
+        System.out.println("2 - Buscar por Gênero");
+        System.out.println("3 - Buscar por Editora E Gênero (interseção)");
+        System.out.println("4 - Buscar por Editora OU Gênero (união)");
+        int opcao = lerInteiro(scanner, "Escolha uma opção: ");
+
+        Set<Integer> idsEncontrados;
+
+        switch (opcao) {
+            case 1: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                idsEncontrados = listaEditora.busca(editora);
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora.");
+                break;
+            }
+            case 2: {
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = listaGenero.busca(genero);
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Gênero.");
+                break;
+            }
+            case 3: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = CRUD.interseccao(listaEditora.busca(editora), listaGenero.busca(genero));
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora AND Lista Invertida de Gênero.");
+                break;
+            }
+            case 4: {
+                System.out.print("Editora: ");
+                String editora = scanner.nextLine();
+                System.out.print("Gênero: ");
+                String genero = scanner.nextLine();
+                idsEncontrados = CRUD.uniao(listaEditora.busca(editora), listaGenero.busca(genero));
+                System.out.println("[Índice] Busca realizada via Lista Invertida de Editora OR Lista Invertida de Gênero.");
+                break;
+            }
+            default:
+                System.out.println("Opção inválida");
+                return;
+        }
+
+        if (idsEncontrados.isEmpty()) {
+            System.out.println("Nenhum livro encontrado.");
+            return;
+        }
+
+        List<Livro> livros = CRUD.buscaPorIds(raf, arvore, idsEncontrados);
+        System.out.println(livros.size() + " livro(s) encontrado(s):");
+        for (Livro l : livros) {
+            System.out.println(l);
+        }
+    }
+
+    // lê um inteiro do usuário, repetindo até ser válido
+    private static int lerInteiro(Scanner scanner, String mensagem) {
+        while (true) {
+            System.out.print(mensagem);
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.println("Digite um número inteiro válido.");
+            }
+        }
+    }
+
+    /**
+     * Atualiza as posições na árvore B varrendo sequencialmente o arquivo de dados.
+     */
+    private static void atualizarPosicoesNaArvore(RandomAccessFile raf,
+                                            ArvoreB arvore) throws IOException {
+        raf.seek(4);                       // pula o cabeçalho
+        long tamanhoArquivo = raf.length();
+
+        while (raf.getFilePointer() < tamanhoArquivo) {
+            long posicao = raf.getFilePointer();   // onde o registro começa
+
+            int id = raf.readInt();
+            int tamanho = raf.readInt();
+
+            // pula lápide (1 byte) + corpo do registro
+            raf.seek(posicao + 8 + tamanho);
+
+            // atualiza o endereço da chave na árvore (uma descida em disco)
+            arvore.atualiza(id, posicao);
+        }
+    }
+}
