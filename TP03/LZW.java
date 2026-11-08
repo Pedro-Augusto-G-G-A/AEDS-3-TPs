@@ -10,7 +10,7 @@ import java.util.HashMap;
 /*
  * Compressão LZW feita BYTE A BYTE sobre o arquivo inteiro (livros.bin).
  *
- * DICIONÁRIO INICIAL (decisão do grupo, exigida pelo enunciado):
+ * DICIONÁRIO INICIAL 
  *   - códigos 0..255 -> as 256 sequências de 1 byte (do byte 0x00 até o 0xFF).
  *     Como o arquivo é binário e pode conter qualquer valor de byte, o dicionário
  *     inicial precisa ter os 256 valores, senão algum byte não teria código.
